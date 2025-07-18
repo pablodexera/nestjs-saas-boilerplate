@@ -1,0 +1,107 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write   # for GHCR
+
+jobs:
+  build-test-and-deploy:
+    runs-on: ubuntu-latest
+
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PORT: 3000
+
+      # Auth
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+
+      # Email
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+      ENABLE_EMAIL: ${{ secrets.ENABLE_EMAIL }}
+
+      # Storage
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+      AWS_S3_REGION: ${{ secrets.AWS_S3_REGION }}
+
+      # Billing
+      STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+      # Logging
+      LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
+      BETTERSTACK_TOKEN: ${{ secrets.BETTERSTACK_TOKEN }}
+
+      # Misc
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      APP_URL: ${{ secrets.APP_URL }}
+      APP_NAME: ${{ secrets.APP_NAME }}
+      APP_WEBSITE: ${{ secrets.APP_WEBSITE }}
+      APP_EMAIL: ${{ secrets.APP_EMAIL }}
+      GUEST_TOKEN_SECRET: ${{ secrets.GUEST_TOKEN_SECRET }}
+      GUEST_TOKEN_EXPIRY_SECONDS: ${{ secrets.GUEST_TOKEN_EXPIRY_SECONDS }}
+      GUEST_WORKSPACE_ID: ${{ secrets.GUEST_WORKSPACE_ID }}
+      RUN_TESTS: ${{ secrets.RUN_TESTS }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Prisma Migrate deploy
+        run: npx prisma migrate deploy
+
+      - name: Prisma Generate
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke Tests
+        if: env.RUN_TESTS == 'true'
+        run: npm test
+
+      - name: Build Docker image
+        run: docker build -t ghcr.io/${{ github.repository }}:latest .
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Docker image
+        run: docker push ghcr.io/${{ github.repository }}:latest
+
+      - name: Deploy to Production Server
+        if: ${{ secrets.PROD_SSH_HOST != '' }}
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker-compose -f /opt/saas/docker-compose.yml up -d --remove-orphans

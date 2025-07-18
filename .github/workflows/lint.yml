@@ -1,0 +1,67 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [main, dev, feature/**]
+  push:
+    branches: [main, dev, feature/**]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PORT: 3000
+
+      # Auth
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+
+      # Email
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+      ENABLE_EMAIL: false
+
+      # Storage
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+      AWS_S3_REGION: ${{ secrets.AWS_S3_REGION }}
+
+      # Billing
+      STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+      # Logging
+      LOG_LEVEL: info
+      BETTERSTACK_TOKEN: ${{ secrets.BETTERSTACK_TOKEN }}
+
+      # Misc
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      APP_URL: ${{ secrets.APP_URL }}
+      APP_NAME: ${{ secrets.APP_NAME }}
+      APP_WEBSITE: ${{ secrets.APP_WEBSITE }}
+      APP_EMAIL: ${{ secrets.APP_EMAIL }}
+      GUEST_TOKEN_SECRET: ${{ secrets.GUEST_TOKEN_SECRET }}
+      GUEST_TOKEN_EXPIRY_SECONDS: 3600
+      GUEST_WORKSPACE_ID: ${{ secrets.GUEST_WORKSPACE_ID }}
+      RUN_TESTS: ${{ secrets.RUN_TESTS }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint code
+        run: npm run lint

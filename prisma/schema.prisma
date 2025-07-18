@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+  ADMIN
+}
+
+/* ─────────────────────────── USERS ─────────────────────────── */
+model User {
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  full_name            String?
+  avatar_url           String?
+  is_global_admin      Boolean   @default(false)
+  primary_workspace_id String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+  last_login_at        DateTime?
+  social_provider      String?
+  country              String?
+  is_disabled          Boolean   @default(false)
+
+  /** Relations **/
+  primary_workspace    Workspace?         @relation("PrimaryWorkspace", fields: [primary_workspace_id], references: [id])
+  workspaces           UserWorkspace[]    @relation("UserMembership")
+  owned_workspaces     Workspace[]        @relation("WorkspaceOwner")
+  invitations_sent     UserWorkspace[]    @relation("UserInvites")   // ← added
+  notifications        Notification[]
+  audit_events         AuditEvent[]       @relation("Actor")
+  files                File[]
+}
+
+/* ───────────────────────── WORKSPACES ───────────────────────── */
+model Workspace {
+  id            String          @id @default(uuid())
+  name          String
+  slug          String          @unique
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  deleted_at    DateTime?
+  owner_id      String?
+  settings_json Json?
+
+  /** Relations **/
+  owner             User?           @relation("WorkspaceOwner", fields: [owner_id], references: [id])
+  members           UserWorkspace[]
+  primary_users     User[]          @relation("PrimaryWorkspace")    // ← added
+  subscriptions     Subscription[]
+  audit_events      AuditEvent[]    @relation("Workspace")
+  guest_tokens      GuestToken[]
+  files             File[]
+}
+
+/* ──────────────────────── USER_WORKSPACES ───────────────────── */
+model UserWorkspace {
+  user_id      String
+  workspace_id String
+  invited_by   String?
+  joined_at    DateTime @default(now())
+  status       String   @default("active")
+  role         WorkspaceRole @default(MEMBER)
+
+  /** Relations **/
+  user         User      @relation("UserMembership", fields: [user_id], references: [id])
+  workspace    Workspace  @relation(fields: [workspace_id], references: [id])
+  invitedBy    User?      @relation("UserInvites", fields: [invited_by], references: [id])
+
+  @@id([user_id, workspace_id])
+}
+
+/* ──────────────────────── SUBSCRIPTIONS ─────────────────────── */
+model Subscription {
+  id                   String    @id @default(uuid())
+  workspace_id         String    @unique
+  plan                 String
+  billing_period       String
+  status               String
+  current_period_start DateTime
+  current_period_end   DateTime
+  trial_end            DateTime?
+  seats                Int       @default(1)
+  record_limit         Int?
+  stripe_id            String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  workspace            Workspace @relation(fields: [workspace_id], references: [id])
+}
+
+/* ───────────────────────── GUEST_TOKENS ─────────────────────── */
+model GuestToken {
+  token         String   @id
+  workspace_id  String?
+  issued_at     DateTime @default(now())
+  expires_at    DateTime
+  permissions   Json?
+  usage_count   Int      @default(0)
+  max_usage     Int?
+
+  workspace     Workspace? @relation(fields: [workspace_id], references: [id])
+}
+
+/* ──────────────────────── AUDIT_EVENTS ──────────────────────── */
+model AuditEvent {
+  id           String    @id @default(uuid())
+  event_type   String
+  actor_id     String?
+  workspace_id String?
+  details      Json?
+  created_at   DateTime  @default(now())
+
+  actor        User?      @relation("Actor", fields: [actor_id], references: [id])
+  workspace    Workspace? @relation("Workspace", fields: [workspace_id], references: [id])
+}
+
+/* ───────────────────────── NOTIFICATIONS ────────────────────── */
+model Notification {
+  id           String    @id @default(uuid())
+  user_id      String
+  type         String
+  payload      Json?
+  sent_via     String?
+  sent_at      DateTime?
+  read_at      DateTime?
+  dismissed_at DateTime?  
+
+  user         User      @relation(fields: [user_id], references: [id])
+}
+
+/* ───────────────────────────── FILES ────────────────────────── */
+model File {
+  id            String    @id @default(uuid())
+  user_id       String
+  workspace_id  String
+  file_name     String
+  file_path     String
+  url           String?
+  mime_type     String?
+  size_bytes    Int?
+  uploaded_at   DateTime  @default(now())
+  metadata      Json?
+
+  user          User      @relation(fields: [user_id], references: [id])
+  workspace     Workspace @relation(fields: [workspace_id], references: [id])
+}
+
+/* ─────────────────────── TEST_SESSIONS ────────────────────────── */
+model TestSessionToken {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  token      String
+  expires_at DateTime
+  clerk_id   String   
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}

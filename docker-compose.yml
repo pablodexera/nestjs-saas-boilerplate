@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saas_app
+    restart: unless-stopped
+
+    # Bring in the same variables you keep in .env, but surface the key ones here
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-3000}
+      DATABASE_URL: ${DATABASE_URL}
+
+      # --- Auth ---
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET}
+
+      # --- Email / Notifications ---
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      ENABLE_EMAIL: ${ENABLE_EMAIL}
+
+      # --- Storage ---
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+
+      # --- Billing ---
+      STRIPE_API_KEY: ${STRIPE_API_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+
+      # --- Logging ---
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      BETTERSTACK_TOKEN: ${BETTERSTACK_TOKEN}
+
+      # --- Misc / Guests / Seeds ---
+      REDIS_URL: ${REDIS_URL}
+      APP_URL: ${APP_URL}
+      APP_NAME: ${APP_NAME}
+      APP_WEBSITE: ${APP_WEBSITE}
+      APP_EMAIL: ${APP_EMAIL}
+      GUEST_TOKEN_SECRET: ${GUEST_TOKEN_SECRET}
+      GUEST_TOKEN_EXPIRY_SECONDS: ${GUEST_TOKEN_EXPIRY_SECONDS:-3600}
+      GUEST_WORKSPACE_ID: ${GUEST_WORKSPACE_ID}
+      RUN_TESTS: ${RUN_TESTS:-false}
+
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "3000:3000"
+    networks: [saasnet]
+
+    command: npm run start:dev
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  saasnet:
+    driver: bridge

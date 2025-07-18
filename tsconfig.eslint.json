@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+
+  "compilerOptions": {
+    /* let ESLint parse the JavaScript config files */
+    "allowJs": true
+  },
+
+  "include": [
+    /* your original TypeScript sources */
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "prisma/seed.ts",
+
+    /* ⬇️  add every tooling / root-level config file ESLint touches */
+    "eslint.config.js",
+    "jest.config.ts",
+    "*.config.js",
+    "*.config.ts"
+  ],
+
+  "exclude": [
+    "node_modules",
+    "dist",
+    "scripts"
+  ]
+}

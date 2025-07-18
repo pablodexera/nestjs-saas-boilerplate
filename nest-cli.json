@@ -1,0 +1,18 @@
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "assets": [
+      {
+        "include": "notifications/email-templates/**/*",
+        "outDir": "dist/src",
+        "watchAssets": true
+      },
+      {
+        "include": "docs/branding/**/*",
+        "outDir": "dist/src",
+        "watchAssets": true
+      }
+    ]
+  }
+}
